@@ -277,6 +277,11 @@ function Curva({ pesos, estatura }) {
   const linea = puntos.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${puntos[0][0].toFixed(1)},${H - P} ${linea} ${puntos[puntos.length - 1][0].toFixed(1)},${H - P}`;
   const corta = (iso) => `${desdeIso(iso).getDate()} ${MESES[desdeIso(iso).getMonth()].slice(0, 3)}`;
+  // si todo el rango cae en un día, la fecha repetida no dice nada: mejor la hora
+  const primero = pesos[0];
+  const ultimo = pesos[pesos.length - 1];
+  const unSoloDia = primero.fecha === ultimo.fecha;
+  const extremo = (p) => (unSoloDia ? p.hora || corta(p.fecha) : corta(p.fecha));
 
   return (
     <section className="en-bloque">
@@ -316,9 +321,9 @@ function Curva({ pesos, estatura }) {
         ))}
       </svg>
       <div className="en-eje" style={{ justifyContent: "space-between" }}>
-        <span style={{ textAlign: "left" }}>{corta(pesos[0].fecha)}</span>
+        <span style={{ textAlign: "left" }}>{extremo(primero)}</span>
         <span>mín {cifra(minY)} · máx {cifra(maxY)}</span>
-        <span style={{ textAlign: "right" }}>{corta(pesos[pesos.length - 1].fecha)}</span>
+        <span style={{ textAlign: "right" }}>{extremo(ultimo)}</span>
       </div>
       {referencias.length > 0 && (
         <p className="en-nota" style={{ margin: "10px 0 0" }}>

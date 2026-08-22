@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { connectAuthEmulator, getAuth, GoogleAuthProvider } from "firebase/auth";
 import {
+  connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -24,3 +25,10 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
 export const proveedorGoogle = new GoogleAuthProvider();
+
+// Con VITE_EMULADOR=1 la app habla con los emuladores locales en vez de con
+// Firebase. Es la única forma de ver las pantallas que exigen sesión iniciada.
+if (import.meta.env.VITE_EMULADOR) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8085);
+}

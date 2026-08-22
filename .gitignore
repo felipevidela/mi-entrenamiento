@@ -5,3 +5,5 @@ dist
 .DS_Store
 dev-dist
 .playwright-mcp
+*-debug.log
+firebase-export-*

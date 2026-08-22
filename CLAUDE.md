@@ -60,18 +60,30 @@ usuarios/{uid}/pesos/{id}       { fecha, hora, kg, grasa, comentario }
 
 ## Verificación visual (obligatoria para cambios de interfaz)
 
-Una sesión de agente no puede iniciar sesión con Google, así que las vistas autenticadas se
-verifican montando una página temporal con datos de ejemplo:
+**Se verifica la app entera, con sesión iniciada, no componentes sueltos.** Montar un
+componente aislado con datos falsos comprueba que ese componente dibuja; no comprueba que la
+pantalla real llegue a mostrarlo. Esa diferencia ya dejó pasar un cambio dado por bueno que
+el usuario no veía.
 
-1. Crear `prueba.html` y `src/prueba.jsx` que importen el componente y le pasen datos falsos.
-2. Exportar temporalmente `CSS` de `App.jsx` y el componente interno que quieras montar.
-3. `npm run dev` y capturar con `playwright-core` (está en la caché de npx; el screenshot por
-   MCP da timeout con páginas largas).
-4. **Borrar `prueba.html`, `src/prueba.jsx` y revertir los exports antes de commitear.**
+Para entrar sin la cuenta de Google real están los emuladores de Firebase:
+
+```bash
+firebase emulators:start --only auth,firestore --project mi-entrenamiento-fv
+VITE_EMULADOR=1 npm run dev
+```
+
+`src/firebase.js` se conecta a los emuladores cuando `VITE_EMULADOR` está definida (Auth en
+9099, Firestore en 8085 — el 8080 suele estar ocupado por Docker). Después, con
+`playwright-core` (está en la caché de npx; el screenshot por MCP da timeout en páginas
+largas): abrir la app, pulsar *Continuar con Google*, y en el popup del emulador ir por texto,
+no por rol — *Add new account* → *Auto-generate user information* → *Sign in with Google.com*.
+Desde ahí se recorre el flujo real: crear registros, capturar, leer la consola.
 
 Probar siempre **cero, uno y muchos** registros. El caso de un solo elemento ya se escapó una
 vez: con un único peso no se dibujaba la curva ni se explicaba por qué, y la pantalla parecía
 rota en vez de incompleta.
+
+Al terminar, matar emuladores y servidor, y no commitear `*-debug.log`.
 
 ## Cuidado con
 
