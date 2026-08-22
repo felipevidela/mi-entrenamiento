@@ -176,6 +176,7 @@ export default function Peso({ uid }) {
         <Formulario
           key={editando || "nuevo"}
           inicial={editado}
+          pesos={pesos}
           onGuardar={guardar}
           onCancelar={() => {
             setAbierto(false);
@@ -189,6 +190,11 @@ export default function Peso({ uid }) {
           Sin registros de peso todavía. Con dos o más aparece la curva de evolución.
         </p>
       ) : (
+        <>
+        <div className="en-dia-top">
+          <h2>Historial</h2>
+          <em>{pesos.length} {pesos.length === 1 ? "registro" : "registros"}</em>
+        </div>
         <ul className="en-pesos">
           {[...pesos].reverse().map((p, i, todos) => {
             const previo = todos[i + 1];
@@ -216,6 +222,7 @@ export default function Peso({ uid }) {
             );
           })}
         </ul>
+        </>
       )}
     </>
   );
@@ -424,12 +431,19 @@ function Eliminar({ onConfirmar }) {
   );
 }
 
-function Formulario({ inicial, onGuardar, onCancelar }) {
+function Formulario({ inicial, pesos, onGuardar, onCancelar }) {
   const [fecha, setFecha] = useState(inicial?.fecha || isoLocal(new Date()));
   const [kg, setKg] = useState(inicial ? String(inicial.kg).replace(".", ",") : "");
   const [comentario, setComentario] = useState(inicial?.comentario || "");
   const [error, setError] = useState("");
   const caja = useRef(null);
+  // un registro en esa fecha que no sea el que se está editando
+  const existente = pesos.find((p) => p.fecha === fecha && p.fecha !== inicial?.fecha);
+  // "hoy" y "ayer" no llevan artículo; "martes 18 de agosto" sí
+  const cuando = (() => {
+    const e = etiquetaFecha(fecha).toLowerCase();
+    return e === "hoy" || e === "ayer" ? e : `el ${e}`;
+  })();
 
   useEffect(() => {
     caja.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -483,7 +497,14 @@ function Formulario({ inicial, onGuardar, onCancelar }) {
 
       {error && <p className="en-error">{error}</p>}
 
-      <p className="en-nota">Se guarda un peso por día: registrar otro en la misma fecha reemplaza el anterior.</p>
+      {existente ? (
+        <p className="en-nota" style={{ color: "var(--alerta)" }}>
+          Ya hay {cifra(existente.kg)} kg registrado {cuando}. Guardar lo reemplaza; para sumar otro
+          registro al historial, cambia la fecha.
+        </p>
+      ) : (
+        <p className="en-nota">Se guarda un peso por día: registrar otro en la misma fecha reemplaza el anterior.</p>
+      )}
 
       <div className="en-acciones">
         <button className="en-guardar" onClick={enviar}>
