@@ -1,6 +1,6 @@
 # Mi entrenamiento
 
-Aplicación web para registrar sesiones de entrenamiento, verlas sobre un calendario mensual y revisar cómo se reparten en el tiempo.
+Aplicación web para registrar sesiones de entrenamiento y peso corporal, ver las sesiones sobre un calendario mensual y revisar cómo se reparten en el tiempo.
 
 ---
 
@@ -89,6 +89,22 @@ Las dos variantes de correr y la separación entre GYM y pesas en casa existen p
 
 **Por qué las horas son strings `HH:MM`:** es el formato nativo de `<input type="time">`, así que no hay parseo ni normalización en el camino entre el formulario y el almacenamiento. La conversión a minutos se hace solo al calcular.
 
+### El peso vive en su propia colección
+
+El registro de peso está en `usuarios/{uid}/pesos`, separado de las sesiones:
+
+```js
+{
+  fecha: "2026-08-21",     // es también el id del documento
+  kg: 78.4,
+  comentario: "en ayunas"
+}
+```
+
+Usar la fecha como id del documento impone un peso por día sin código de deduplicación: registrar de nuevo el mismo día sobrescribe. Pesarse dos veces en un día es ruido de medición, no dos datos.
+
+Mezclarlo con las sesiones habría sido más barato en escritura y más caro en todo lo demás: un peso no es un entrenamiento, no pinta el calendario, no suma a la racha ni a los minutos del mes. La curva usa una escala ajustada al rango real y no desde cero, porque entre 74 y 79 kilos una escala desde cero aplanaría la variación hasta volverla invisible.
+
 ### Compatibilidad de datos antiguos
 
 Las actividades cambiaron después de que ya existían registros. En vez de borrar o dejar que la app fallara al no encontrar el tipo, la traducción ocurre al renderizar:
@@ -124,8 +140,9 @@ Cada celda del calendario es un `<button>` con `aria-label` que dice el día y l
 src/
 ├── datos.js       catálogo de actividades, fechas ISO locales, duración y rachas
 ├── firebase.js    inicialización, autenticación y Firestore con caché persistente
-├── App.jsx        acceso, calendario, métricas del mes, formulario y CSS
-└── Analisis.jsx   agregación y gráficos del análisis
+├── App.jsx        acceso, pestañas, calendario, métricas del mes y CSS
+├── Analisis.jsx   agregación y gráficos del análisis
+└── Peso.jsx       registro de peso, curva de evolución y lista
 ```
 
 `entrenamientos.jsx` es la versión original de una sola pantalla, conservada como referencia.

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { auth, db, proveedorGoogle } from "./firebase.js";
 import Analisis from "./Analisis.jsx";
+import Peso from "./Peso.jsx";
 import {
   DIAS,
   MESES,
@@ -67,7 +68,7 @@ const CSS = `
 
 /* pestañas */
 .en-pestanas{display:flex;gap:6px;margin-bottom:14px;}
-.en-pestana{flex:1;background:transparent;border:1px solid var(--linea);color:var(--tenue);border-radius:10px;padding:10px;font-size:14px;font-weight:500;}
+.en-pestana{flex:1;background:transparent;border:1px solid var(--linea);color:var(--tenue);border-radius:10px;padding:10px 4px;font-size:13.5px;font-weight:500;}
 .en-pestana:hover{color:var(--texto);}
 .en-pestana[aria-pressed="true"]{background:var(--panel);border-color:var(--cian);color:var(--texto);}
 
@@ -180,6 +181,14 @@ textarea.en-input{resize:vertical;min-height:64px;line-height:1.45;}
 .en-guardar:hover{background:#6FD4E6;}
 .en-secund{background:transparent;border:1px solid var(--linea);color:var(--tenue);border-radius:10px;padding:13px 16px;font-size:14px;}
 .en-secund:hover{color:var(--texto);border-color:var(--texto);}
+.en-pesos{list-style:none;margin:10px 0 0;padding:0;}
+.en-pesos li{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:13px 14px;margin-bottom:8px;}
+.en-peso-linea{display:flex;align-items:baseline;gap:9px;}
+.en-peso-linea b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;}
+.en-delta{font-family:'Space Mono',monospace;font-size:11.5px;color:var(--tenue);font-variant-numeric:tabular-nums;}
+.en-peso-linea time{margin-left:auto;font-family:'Space Mono',monospace;font-size:11.5px;color:var(--tenue);white-space:nowrap;}
+.en-curva{width:100%;height:auto;display:block;overflow:visible;}
+.en-nota{font-size:12px;color:var(--tenue);line-height:1.45;margin:0 0 13px;}
 .en-pie{font-size:12px;color:var(--tenue);text-align:center;margin-top:28px;line-height:1.5;}
 @media (max-width:340px){
   .en-tipos{grid-template-columns:1fr;}
@@ -384,11 +393,16 @@ function Registro({ usuario }) {
         <button className="en-pestana" aria-pressed={vista === "analisis"} onClick={() => setVista("analisis")}>
           Análisis
         </button>
+        <button className="en-pestana" aria-pressed={vista === "peso"} onClick={() => setVista("peso")}>
+          Peso
+        </button>
       </div>
 
       {fallo && <p className="en-error">{fallo}</p>}
 
-      {vista === "analisis" ? (
+      {vista === "peso" ? (
+        <Peso uid={usuario.uid} />
+      ) : vista === "analisis" ? (
         cargando ? (
           <p className="en-vacio">Cargando el registro…</p>
         ) : (
