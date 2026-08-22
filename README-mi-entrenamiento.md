@@ -105,6 +105,10 @@ Usar la fecha como id del documento impone un peso por día sin código de dedup
 
 Mezclarlo con las sesiones habría sido más barato en escritura y más caro en todo lo demás: un peso no es un entrenamiento, no pinta el calendario, no suma a la racha ni a los minutos del mes. La curva usa una escala ajustada al rango real y no desde cero, porque entre 74 y 79 kilos una escala desde cero aplanaría la variación hasta volverla invisible.
 
+La estatura va en el documento `usuarios/{uid}`, no en cada peso: es un dato de la persona y no del registro. Con ella se calcula el IMC y se traducen sus umbrales a kilos, que es lo que dibujan las líneas punteadas de la curva. Los tramos de la OMS se muestran como etiqueta —"peso normal", "sobrepeso"— sin ninguna recomendación asociada: la app informa, no aconseja.
+
+El segundo gráfico es la variación por mes. La curva muestra el nivel y esa muestra el ritmo, que es lo que la curva no deja leer de un vistazo. Cada mes se compara con el último registro anterior al mes, no con el primero del propio mes: si no te pesaste el día 1, el cambio ya venía ocurriendo.
+
 ### Compatibilidad de datos antiguos
 
 Las actividades cambiaron después de que ya existían registros. En vez de borrar o dejar que la app fallara al no encontrar el tipo, la traducción ocurre al renderizar:

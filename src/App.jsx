@@ -189,6 +189,14 @@ textarea.en-input{resize:vertical;min-height:64px;line-height:1.45;}
 .en-peso-linea time{margin-left:auto;font-family:'Space Mono',monospace;font-size:11.5px;color:var(--tenue);white-space:nowrap;}
 .en-curva{width:100%;height:auto;display:block;overflow:visible;}
 .en-nota{font-size:12px;color:var(--tenue);line-height:1.45;margin:0 0 13px;}
+.en-estatura{display:flex;align-items:baseline;gap:9px;justify-content:center;font-size:12.5px;color:var(--tenue);margin:12px 0 0;}
+.en-gr2{display:flex;gap:3px;height:104px;}
+.en-col2{flex:1;min-width:0;display:flex;flex-direction:column;}
+.en-mitad{flex:1;display:flex;}
+.en-mitad[data-lado="arriba"]{align-items:flex-end;border-bottom:1px solid var(--linea);}
+.en-mitad[data-lado="abajo"]{align-items:flex-start;}
+.en-mitad .en-barra{border-radius:3px;}
+.en-mitad[data-lado="abajo"] .en-barra{border-radius:0 0 3px 3px;opacity:.72;}
 .en-pie{font-size:12px;color:var(--tenue);text-align:center;margin-top:28px;line-height:1.5;}
 @media (max-width:340px){
   .en-tipos{grid-template-columns:1fr;}
