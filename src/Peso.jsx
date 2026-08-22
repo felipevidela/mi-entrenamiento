@@ -155,8 +155,16 @@ export default function Peso({ uid }) {
         </p>
       )}
 
-      {pesos.length >= 2 && <Curva pesos={pesos} estatura={estatura} />}
-      {pesos.length >= 2 && <Variacion pesos={pesos} />}
+      {pesos.length >= 2 ? (
+        <>
+          <Curva pesos={pesos} estatura={estatura} />
+          <Variacion pesos={pesos} />
+        </>
+      ) : pesos.length === 1 ? (
+        <p className="en-vacio" style={{ marginTop: 10 }}>
+          Con un segundo registro aparecen la curva de evolución y la variación por mes.
+        </p>
+      ) : null}
 
       {!abierto && (
         <button className="en-abrir" onClick={() => setAbierto(true)}>
