@@ -30,11 +30,13 @@ firebase deploy --only firestore:rules
 ```
 usuarios/{uid}                  { estaturaCm }
 usuarios/{uid}/sesiones/{id}    { fecha, tipo, inicio, fin, comentario }
-usuarios/{uid}/pesos/{fecha}    { kg, comentario }
+usuarios/{uid}/pesos/{id}       { fecha, hora, kg, grasa, comentario }
 ```
 
-- En pesos, **el id del documento es la fecha**: eso impone un peso por día sin código de
-  deduplicación. Cambiar la fecha al editar significa borrar el documento anterior.
+- En pesos se admiten varias pesadas por día; la `hora` es lo que las distingue y las ordena.
+  `grasa` es opcional y vale `null` cuando no se midió.
+- Los documentos de peso antiguos usaban la fecha como id y no guardaban `fecha` ni `hora`.
+  Al leerlos se toma la fecha del id y se asume medianoche — no los reescribas.
 - `fecha` es el string `"YYYY-MM-DD"` construido con los componentes locales, nunca un
   `Date`: al serializarse se convierte a UTC y una sesión de las 21:00 vuelve como el día
   siguiente.

@@ -171,6 +171,7 @@ const CSS = `
 .en-input{width:100%;background:var(--panel2);border:1px solid var(--linea);border-radius:9px;padding:11px 12px;color:var(--texto);font-family:'Barlow',sans-serif;font-size:15px;}
 .en-input[type="time"],.en-input[type="date"]{font-family:'Space Mono',monospace;font-size:14px;}
 .en-dos{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.en-hora{font-size:10.5px;opacity:.75;}
 .en-tipos{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}
 .en-tipo{background:var(--panel2);border:1.5px solid var(--linea);border-radius:9px;padding:12px 6px;color:var(--tenue);font-size:13.5px;font-weight:500;line-height:1.2;}
 .en-tipo[data-on="1"]{color:#0E1F2A;font-weight:600;}

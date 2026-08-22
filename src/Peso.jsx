@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
-import { MESES, desdeIso, dosDig, etiquetaFecha, isoLocal } from "./datos.js";
+import { MESES, desdeIso, dosDig, etiquetaFecha, isoLocal, minutos } from "./datos.js";
 
 // Umbrales de la OMS. Se muestran como referencia, sin recomendación de ningún tipo.
 const TRAMOS = [
@@ -20,6 +20,14 @@ const cifra = (n) => n.toFixed(1).replace(".", ",");
 const breve = (n) => (Number.isInteger(n) ? String(n) : cifra(n));
 const conSigno = (n) => (n > 0 ? "+" : n < 0 ? "-" : "") + cifra(Math.abs(n));
 
+// los registros se ordenan por el momento de la pesada, no solo por el día
+const momento = (p) => `${p.fecha} ${p.hora || "00:00"}`;
+const instante = (p) => desdeIso(p.fecha).getTime() + minutos(p.hora || "00:00") * 60000;
+const horaActual = () => {
+  const d = new Date();
+  return `${dosDig(d.getHours())}:${dosDig(d.getMinutes())}`;
+};
+
 export default function Peso({ uid }) {
   const [pesos, setPesos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -30,6 +38,28 @@ export default function Peso({ uid }) {
   const [pidiendoEstatura, setPidiendoEstatura] = useState(false);
 
   const coleccion = useCallback(() => collection(db, "usuarios", uid, "pesos"), [uid]);
+
+  useEffect(
+    () =>
+      onSnapshot(
+        coleccion(),
+        (snap) => {
+          setPesos(
+            snap.docs
+              // los registros antiguos usaban la fecha como id y no guardaban la hora
+              .map((d) => ({ id: d.id, fecha: d.data().fecha || d.id, ...d.data() }))
+              .sort((a, b) => momento(a).localeCompare(momento(b)))
+          );
+          setFallo("");
+          setCargando(false);
+        },
+        () => {
+          setFallo("No se pudo leer el registro de peso. Revisa tu conexión.");
+          setCargando(false);
+        }
+      ),
+    [coleccion]
+  );
 
   useEffect(
     () => onSnapshot(doc(db, "usuarios", uid), (d) => setEstatura(d.data()?.estaturaCm ?? null), () => {}),
@@ -48,47 +78,29 @@ export default function Peso({ uid }) {
     [uid]
   );
 
-  useEffect(
-    () =>
-      onSnapshot(
-        coleccion(),
-        (snap) => {
-          // el id del documento es la fecha, así que hay un peso por día
-          setPesos(snap.docs.map((d) => ({ ...d.data(), fecha: d.id })).sort((a, b) => a.fecha.localeCompare(b.fecha)));
-          setFallo("");
-          setCargando(false);
-        },
-        () => {
-          setFallo("No se pudo leer el registro de peso. Revisa tu conexión.");
-          setCargando(false);
-        }
-      ),
-    [coleccion]
-  );
-
   const guardar = useCallback(
-    async (datos, fechaPrevia) => {
+    async (datos) => {
+      const id = editando;
       setEditando(null);
       setAbierto(false);
       try {
-        await setDoc(doc(coleccion(), datos.fecha), { kg: datos.kg, comentario: datos.comentario });
-        // si la edición movió el registro de día, el documento viejo sobra
-        if (fechaPrevia && fechaPrevia !== datos.fecha) await deleteDoc(doc(coleccion(), fechaPrevia));
+        if (id) await updateDoc(doc(coleccion(), id), datos);
+        else await addDoc(coleccion(), datos);
       } catch (e) {
         setFallo("No se pudo guardar el peso. Revisa tu conexión.");
       }
     },
-    [coleccion]
+    [editando, coleccion]
   );
 
   const eliminar = useCallback(
-    async (fecha) => {
-      if (editando === fecha) {
+    async (id) => {
+      if (editando === id) {
         setEditando(null);
         setAbierto(false);
       }
       try {
-        await deleteDoc(doc(coleccion(), fecha));
+        await deleteDoc(doc(coleccion(), id));
       } catch (e) {
         setFallo("No se pudo eliminar el registro. Revisa tu conexión.");
       }
@@ -113,7 +125,7 @@ export default function Peso({ uid }) {
     };
   }, [pesos, estatura]);
 
-  const editado = editando ? pesos.find((p) => p.fecha === editando) : null;
+  const editado = editando ? pesos.find((p) => p.id === editando) : null;
 
   if (cargando) return <p className="en-vacio">Cargando el registro de peso…</p>;
 
@@ -126,7 +138,10 @@ export default function Peso({ uid }) {
           <div className="en-metrica">
             <b>{cifra(resumen.ultimo.kg)}<i style={{ fontStyle: "normal", color: "var(--tenue)", fontSize: 14 }}> kg</i></b>
             <span>último peso</span>
-            <em className="en-comp">{etiquetaFecha(resumen.ultimo.fecha).toLowerCase()}</em>
+            <em className="en-comp">
+              {etiquetaFecha(resumen.ultimo.fecha).toLowerCase()}
+              {resumen.ultimo.grasa != null && ` · ${cifra(resumen.ultimo.grasa)} % grasa`}
+            </em>
           </div>
           <div className="en-metrica">
             <b>{resumen.imc === null ? "—" : cifra(resumen.imc)}</b>
@@ -155,17 +170,6 @@ export default function Peso({ uid }) {
         </p>
       )}
 
-      {pesos.length >= 2 ? (
-        <>
-          <Curva pesos={pesos} estatura={estatura} />
-          <Variacion pesos={pesos} />
-        </>
-      ) : pesos.length === 1 ? (
-        <p className="en-vacio" style={{ marginTop: 10 }}>
-          Con un segundo registro aparecen la curva de evolución y la variación por mes.
-        </p>
-      ) : null}
-
       {!abierto && (
         <button className="en-abrir" onClick={() => setAbierto(true)}>
           + Registrar peso
@@ -176,7 +180,6 @@ export default function Peso({ uid }) {
         <Formulario
           key={editando || "nuevo"}
           inicial={editado}
-          pesos={pesos}
           onGuardar={guardar}
           onCancelar={() => {
             setAbierto(false);
@@ -185,43 +188,58 @@ export default function Peso({ uid }) {
         />
       )}
 
+      <div className="en-dia-top">
+        <h2>Historial</h2>
+        {pesos.length > 0 && <em>{pesos.length} {pesos.length === 1 ? "registro" : "registros"}</em>}
+      </div>
+
       {pesos.length === 0 ? (
-        <p className="en-vacio" style={{ marginTop: 10 }}>
-          Sin registros de peso todavía. Con dos o más aparece la curva de evolución.
+        <p className="en-vacio">
+          Sin registros de peso todavía. Cada pesada queda aquí, y con dos o más aparece la curva de evolución.
         </p>
       ) : (
         <>
-        <div className="en-dia-top">
-          <h2>Historial</h2>
-          <em>{pesos.length} {pesos.length === 1 ? "registro" : "registros"}</em>
-        </div>
-        <ul className="en-pesos">
-          {[...pesos].reverse().map((p, i, todos) => {
-            const previo = todos[i + 1];
-            return (
-              <li key={p.fecha}>
-                <div className="en-peso-linea">
-                  <b>{cifra(p.kg)} kg</b>
-                  {previo && <span className="en-delta">{conSigno(p.kg - previo.kg)}</span>}
-                  <time>{etiquetaFecha(p.fecha)}</time>
-                </div>
-                {p.comentario && <p className="en-coment">{p.comentario}</p>}
-                <div className="en-ops">
-                  <button
-                    className="en-op"
-                    onClick={() => {
-                      setEditando(p.fecha);
-                      setAbierto(true);
-                    }}
-                  >
-                    Editar
-                  </button>
-                  <Eliminar onConfirmar={() => eliminar(p.fecha)} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+          <ul className="en-pesos">
+            {[...pesos].reverse().map((p, i, todos) => {
+              const previo = todos[i + 1];
+              return (
+                <li key={p.id}>
+                  <div className="en-peso-linea">
+                    <b>{cifra(p.kg)} kg</b>
+                    {previo && <span className="en-delta">{conSigno(p.kg - previo.kg)}</span>}
+                    {p.grasa != null && <span className="en-delta">· {cifra(p.grasa)} % grasa</span>}
+                    <time>
+                      {etiquetaFecha(p.fecha)}
+                      {p.hora && <span className="en-hora"> {p.hora}</span>}
+                    </time>
+                  </div>
+                  {p.comentario && <p className="en-coment">{p.comentario}</p>}
+                  <div className="en-ops">
+                    <button
+                      className="en-op"
+                      onClick={() => {
+                        setEditando(p.id);
+                        setAbierto(true);
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <Eliminar onConfirmar={() => eliminar(p.id)} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {pesos.length >= 2 ? (
+            <>
+              <Curva pesos={pesos} estatura={estatura} />
+              <Variacion pesos={pesos} />
+            </>
+          ) : (
+            <p className="en-vacio" style={{ marginTop: 10 }}>
+              Con un segundo registro aparecen la curva de evolución y la variación por mes.
+            </p>
+          )}
         </>
       )}
     </>
@@ -235,7 +253,7 @@ function Curva({ pesos, estatura }) {
   const H = 108;
   const P = 9;
 
-  const xs = pesos.map((p) => desdeIso(p.fecha).getTime());
+  const xs = pesos.map(instante);
   const kgs = pesos.map((p) => p.kg);
   const minX = xs[0];
   const maxX = xs[xs.length - 1];
@@ -375,6 +393,122 @@ function Variacion({ pesos }) {
   );
 }
 
+/* ─────────────────────────── piezas ─────────────────────────── */
+
+function Eliminar({ onConfirmar }) {
+  const [confirmar, setConfirmar] = useState(false);
+  if (!confirmar)
+    return (
+      <button className="en-op" data-peligro="1" onClick={() => setConfirmar(true)}>
+        Eliminar
+      </button>
+    );
+  return (
+    <>
+      <button className="en-op" data-peligro="1" onClick={onConfirmar}>Confirmar</button>
+      <button className="en-op" onClick={() => setConfirmar(false)}>Cancelar</button>
+    </>
+  );
+}
+
+function Formulario({ inicial, onGuardar, onCancelar }) {
+  const [fecha, setFecha] = useState(inicial?.fecha || isoLocal(new Date()));
+  const [hora, setHora] = useState(inicial?.hora || horaActual());
+  const [kg, setKg] = useState(inicial ? String(inicial.kg).replace(".", ",") : "");
+  const [grasa, setGrasa] = useState(inicial?.grasa != null ? String(inicial.grasa).replace(".", ",") : "");
+  const [comentario, setComentario] = useState(inicial?.comentario || "");
+  const [error, setError] = useState("");
+  const caja = useRef(null);
+
+  useEffect(() => {
+    caja.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
+  function enviar() {
+    if (!fecha) return setError("Indica la fecha del registro.");
+    if (!hora) return setError("Indica la hora de la pesada.");
+    const n = parseFloat(kg.replace(",", "."));
+    if (!isFinite(n)) return setError("Escribe el peso en kilos, por ejemplo 78,4.");
+    if (n < 20 || n > 400) return setError("El peso debe estar entre 20 y 400 kilos.");
+    // la grasa es opcional, pero si se escribe algo tiene que ser un porcentaje válido
+    let g = null;
+    if (grasa.trim()) {
+      g = parseFloat(grasa.replace(",", "."));
+      if (!isFinite(g) || g < 1 || g > 70) return setError("La grasa corporal debe ser un porcentaje entre 1 y 70.");
+      g = Math.round(g * 10) / 10;
+    }
+    setError("");
+    onGuardar({ fecha, hora, kg: Math.round(n * 10) / 10, grasa: g, comentario: comentario.trim() });
+  }
+
+  return (
+    <div className="en-form" ref={caja}>
+      <div className="en-form-top">
+        <h3>{inicial ? "Editar peso" : "Nuevo peso"}</h3>
+        <button className="en-cerrar" onClick={onCancelar} aria-label="Cerrar">×</button>
+      </div>
+
+      <div className="en-campo en-dos">
+        <div>
+          <label className="en-label" htmlFor="en-pfecha">Fecha</label>
+          <input id="en-pfecha" className="en-input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </div>
+        <div>
+          <label className="en-label" htmlFor="en-phora">Hora</label>
+          <input id="en-phora" className="en-input" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="en-campo en-dos">
+        <div>
+          <label className="en-label" htmlFor="en-kg">Kilos</label>
+          <input
+            id="en-kg"
+            className="en-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="78,4"
+            value={kg}
+            onChange={(e) => setKg(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="en-label" htmlFor="en-grasa">Grasa % <i style={{ fontStyle: "normal", textTransform: "none", letterSpacing: 0 }}>(opcional)</i></label>
+          <input
+            id="en-grasa"
+            className="en-input"
+            type="text"
+            inputMode="decimal"
+            placeholder="18,2"
+            value={grasa}
+            onChange={(e) => setGrasa(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="en-campo">
+        <label className="en-label" htmlFor="en-pcom">Comentario</label>
+        <textarea
+          id="en-pcom"
+          className="en-input"
+          placeholder="En ayunas, después de entrenar…"
+          value={comentario}
+          onChange={(e) => setComentario(e.target.value)}
+        />
+      </div>
+
+      {error && <p className="en-error">{error}</p>}
+
+      <div className="en-acciones">
+        <button className="en-guardar" onClick={enviar}>
+          {inicial ? "Guardar cambios" : "Registrar peso"}
+        </button>
+        <button className="en-secund" onClick={onCancelar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function Estatura({ inicial, onGuardar, onCancelar }) {
   const [cm, setCm] = useState(inicial ? String(inicial) : "");
   const [error, setError] = useState("");
@@ -407,109 +541,6 @@ function Estatura({ inicial, onGuardar, onCancelar }) {
       <p className="en-nota">Se guarda una vez y se usa solo para calcular el IMC.</p>
       <div className="en-acciones">
         <button className="en-guardar" onClick={enviar}>Guardar</button>
-        <button className="en-secund" onClick={onCancelar}>Cancelar</button>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────── piezas ─────────────────────────── */
-
-function Eliminar({ onConfirmar }) {
-  const [confirmar, setConfirmar] = useState(false);
-  if (!confirmar)
-    return (
-      <button className="en-op" data-peligro="1" onClick={() => setConfirmar(true)}>
-        Eliminar
-      </button>
-    );
-  return (
-    <>
-      <button className="en-op" data-peligro="1" onClick={onConfirmar}>Confirmar</button>
-      <button className="en-op" onClick={() => setConfirmar(false)}>Cancelar</button>
-    </>
-  );
-}
-
-function Formulario({ inicial, pesos, onGuardar, onCancelar }) {
-  const [fecha, setFecha] = useState(inicial?.fecha || isoLocal(new Date()));
-  const [kg, setKg] = useState(inicial ? String(inicial.kg).replace(".", ",") : "");
-  const [comentario, setComentario] = useState(inicial?.comentario || "");
-  const [error, setError] = useState("");
-  const caja = useRef(null);
-  // un registro en esa fecha que no sea el que se está editando
-  const existente = pesos.find((p) => p.fecha === fecha && p.fecha !== inicial?.fecha);
-  // "hoy" y "ayer" no llevan artículo; "martes 18 de agosto" sí
-  const cuando = (() => {
-    const e = etiquetaFecha(fecha).toLowerCase();
-    return e === "hoy" || e === "ayer" ? e : `el ${e}`;
-  })();
-
-  useEffect(() => {
-    caja.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, []);
-
-  function enviar() {
-    if (!fecha) return setError("Indica la fecha del registro.");
-    const n = parseFloat(kg.replace(",", "."));
-    if (!isFinite(n)) return setError("Escribe el peso en kilos, por ejemplo 78,4.");
-    if (n < 20 || n > 400) return setError("El peso debe estar entre 20 y 400 kilos.");
-    setError("");
-    onGuardar({ fecha, kg: Math.round(n * 10) / 10, comentario: comentario.trim() }, inicial?.fecha);
-  }
-
-  return (
-    <div className="en-form" ref={caja}>
-      <div className="en-form-top">
-        <h3>{inicial ? "Editar peso" : "Nuevo peso"}</h3>
-        <button className="en-cerrar" onClick={onCancelar} aria-label="Cerrar">×</button>
-      </div>
-
-      <div className="en-campo en-dos">
-        <div>
-          <label className="en-label" htmlFor="en-pfecha">Fecha</label>
-          <input id="en-pfecha" className="en-input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-        </div>
-        <div>
-          <label className="en-label" htmlFor="en-kg">Peso (kg)</label>
-          <input
-            id="en-kg"
-            className="en-input"
-            type="text"
-            inputMode="decimal"
-            placeholder="78,4"
-            value={kg}
-            onChange={(e) => setKg(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="en-campo">
-        <label className="en-label" htmlFor="en-pcom">Comentario</label>
-        <textarea
-          id="en-pcom"
-          className="en-input"
-          placeholder="En ayunas, después de entrenar…"
-          value={comentario}
-          onChange={(e) => setComentario(e.target.value)}
-        />
-      </div>
-
-      {error && <p className="en-error">{error}</p>}
-
-      {existente ? (
-        <p className="en-nota" style={{ color: "var(--alerta)" }}>
-          Ya hay {cifra(existente.kg)} kg registrado {cuando}. Guardar lo reemplaza; para sumar otro
-          registro al historial, cambia la fecha.
-        </p>
-      ) : (
-        <p className="en-nota">Se guarda un peso por día: registrar otro en la misma fecha reemplaza el anterior.</p>
-      )}
-
-      <div className="en-acciones">
-        <button className="en-guardar" onClick={enviar}>
-          {inicial ? "Guardar cambios" : "Registrar peso"}
-        </button>
         <button className="en-secund" onClick={onCancelar}>Cancelar</button>
       </div>
     </div>

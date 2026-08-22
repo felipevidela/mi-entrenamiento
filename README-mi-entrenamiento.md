@@ -95,13 +95,17 @@ El registro de peso está en `usuarios/{uid}/pesos`, separado de las sesiones:
 
 ```js
 {
-  fecha: "2026-08-21",     // es también el id del documento
+  fecha: "2026-08-21",
+  hora: "07:20",
   kg: 78.4,
+  grasa: 18.2,             // opcional, null si no se midió
   comentario: "en ayunas"
 }
 ```
 
-Usar la fecha como id del documento impone un peso por día sin código de deduplicación: registrar de nuevo el mismo día sobrescribe. Pesarse dos veces en un día es ruido de medición, no dos datos.
+La primera versión usaba la fecha como id del documento para imponer un peso por día. Era menos código y resultó ser la decisión equivocada: el formulario propone siempre la fecha de hoy, así que registrar dos pesadas seguidas sobrescribía la primera **en silencio**, y desde fuera se veía como que la app no guardaba el historial. Pesarse en ayunas y de noche no es ruido, es información sobre la variación dentro del día.
+
+Ahora el id lo asigna Firestore y la hora forma parte del registro: es lo que distingue y ordena dos pesadas del mismo día. Los documentos antiguos no tienen `fecha` ni `hora` guardados, así que al leerlos se toma la fecha del id y se asume medianoche, con el mismo criterio que `tipoDe`: traducir lo que se puede, tolerar lo que no.
 
 Mezclarlo con las sesiones habría sido más barato en escritura y más caro en todo lo demás: un peso no es un entrenamiento, no pinta el calendario, no suma a la racha ni a los minutos del mes. La curva usa una escala ajustada al rango real y no desde cero, porque entre 74 y 79 kilos una escala desde cero aplanaría la variación hasta volverla invisible.
 
