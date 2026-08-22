@@ -1,0 +1,10 @@
+rules_version = '2';
+
+// Cada persona lee y escribe solo su propio registro.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /usuarios/{uid}/sesiones/{sesion} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
