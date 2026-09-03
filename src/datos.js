@@ -14,6 +14,25 @@ const EQUIVALENCIAS = { correr: "correr_ciudad" };
 const SIN_TIPO = { id: "sin_tipo", label: "Sin categoría", color: "#7EA2B0" };
 export const tipoDe = (id) => TIPO[id] || TIPO[EQUIVALENCIAS[id]] || SIN_TIPO;
 
+// escala de comodidad física, del registro de comodidad y de la "lata"
+export const NIVELES = [
+  { valor: 1, label: "muy incómodo" },
+  { valor: 2, label: "incómodo" },
+  { valor: 3, label: "normal" },
+  { valor: 4, label: "cómodo" },
+  { valor: 5, label: "muy cómodo" },
+];
+// señales físicas, sin nada de apariencia ni autoimagen: la app registra
+// sensación corporal, no cómo se ve nadie
+export const SENALES = [
+  { id: "ropa_apretada", label: "Ropa apretada" },
+  { id: "sudor", label: "Sudor" },
+  { id: "pesadez", label: "Pesadez" },
+  { id: "energia_baja", label: "Energía baja" },
+  { id: "dormi_mal", label: "Dormí mal" },
+  { id: "rigidez", label: "Rigidez" },
+];
+
 export const DIAS = ["L", "M", "M", "J", "V", "S", "D"];
 export const DIAS_LARGO = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 export const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -68,6 +87,17 @@ export function calcularRacha(porFecha) {
   }
   return n;
 }
+
+export function diaAnterior(iso) {
+  const d = desdeIso(iso);
+  d.setDate(d.getDate() - 1);
+  return isoLocal(d);
+}
+
+export const horaActual = () => {
+  const d = new Date();
+  return `${dosDig(d.getHours())}:${dosDig(d.getMinutes())}`;
+};
 
 // la mayor cantidad de días consecutivos alcanzada en todo el historial
 export function rachaMasLarga(fechas) {

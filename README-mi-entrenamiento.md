@@ -45,6 +45,23 @@ Un entrenamiento de 23:30 a 00:30 se guarda con la fecha del día en que se sali
 
 La alternativa —partirla entre dos días— haría que una sola salida pintara dos celdas del calendario y sumara dos días a la racha. Atribuirla al día de inicio mantiene la equivalencia entre una celda pintada y una salida a entrenar, que es lo que el calendario comunica.
 
+### Comodidad: sensación física, nunca apariencia
+
+El registro de comodidad existe para hacer visible el costo diario de no entrenar y para
+contrastar la lata anticipada de una sesión con la real. Es deliberadamente estrecho: nivel
+de 1 a 5, señales físicas (ropa apretada, sudor, pesadez, energía baja, dormí mal, rigidez)
+y un comentario. Sin campos de apariencia ni autoimagen, sin fotos, sin valoración estética.
+
+Las comparaciones tienen puertas duras: nada se muestra antes de 10 días registrados y 3 por
+grupo, el n acompaña a cada barra, y una diferencia menor a dos errores estándar se rotula
+"sin diferencia clara todavía" en vez de presentarse como resultado. Está prohibido — y
+escrito en `CLAUDE.md` — convertir esto en scores, rachas de días incómodos o consejos.
+
+El recordatorio de las 21:00 es una alarma nativa del teléfono más un aviso dentro de la app:
+la web no tiene notificaciones locales programadas (la API que lo permitía fue abandonada) y
+el push real exige un servidor que esta app no tiene. Si el aviso no basta, la fase 2 es un
+cron de GitHub Actions con Web Push.
+
 ### Horas de inicio y término, no duración
 
 Se pide el horario y la duración se calcula. Guardar solo la duración perdería información que no se puede reconstruir: a qué hora del día se entrena. Guardar el horario permite derivar la duración y además deja la puerta abierta a análisis futuros de rutina horaria.
@@ -159,6 +176,9 @@ Los pasos de despliegue están en `DESPLIEGUE.md`.
 ---
 
 ## 6. Pendientes
+
+- **Push remoto para el recordatorio de comodidad** (cron de GitHub Actions + Web Push),
+  solo si la alarma nativa más el aviso in-app resultan insuficientes.
 
 - **Campos por tipo**: distancia para correr y bici, series y peso para GYM y pesas en casa. Implica pasar de un modelo plano a uno con atributos por actividad.
 - **Vista de semana con eje horario**, que existía en una versión anterior. El gráfico de hora habitual responde la pregunta agregada, no la de una semana concreta.

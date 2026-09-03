@@ -11,9 +11,11 @@ import {
 import { auth, db, proveedorGoogle } from "./firebase.js";
 import Analisis from "./Analisis.jsx";
 import Peso from "./Peso.jsx";
+import Comodidad from "./Comodidad.jsx";
 import {
   DIAS,
   MESES,
+  NIVELES,
   TIPOS,
   calcularRacha,
   cruzaMedianoche,
@@ -22,6 +24,7 @@ import {
   duracion,
   etiquetaFecha,
   formatoDur,
+  horaActual,
   isoLocal,
   minutos,
   tipoDe,
@@ -68,7 +71,7 @@ const CSS = `
 
 /* pestañas */
 .en-pestanas{display:flex;gap:6px;margin-bottom:14px;}
-.en-pestana{flex:1;background:transparent;border:1px solid var(--linea);color:var(--tenue);border-radius:10px;padding:10px 4px;font-size:13.5px;font-weight:500;}
+.en-pestana{flex:1;background:transparent;border:1px solid var(--linea);color:var(--tenue);border-radius:10px;padding:10px 2px;font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .en-pestana:hover{color:var(--texto);}
 .en-pestana[aria-pressed="true"]{background:var(--panel);border-color:var(--cian);color:var(--texto);}
 
@@ -190,6 +193,22 @@ textarea.en-input{resize:vertical;min-height:64px;line-height:1.45;}
 .en-peso-linea time{margin-left:auto;font-family:'Space Mono',monospace;font-size:11.5px;color:var(--tenue);white-space:nowrap;}
 .en-curva{width:100%;height:auto;display:block;overflow:visible;}
 .en-nota{font-size:12px;color:var(--tenue);line-height:1.45;margin:0 0 13px;}
+.en-niveles{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;}
+.en-nivel{background:var(--panel2);border:1.5px solid var(--linea);border-radius:10px;padding:13px 2px 10px;color:var(--texto);display:flex;flex-direction:column;gap:5px;align-items:center;}
+.en-nivel b{font-family:'Space Grotesk',sans-serif;font-size:18px;line-height:1;}
+.en-nivel span{font-size:8.5px;color:var(--tenue);line-height:1.15;text-align:center;}
+.en-nivel:hover:not(:disabled){border-color:var(--cian);}
+.en-nivel:disabled{opacity:.5;cursor:default;}
+.en-nivel[data-on="1"]{border-color:var(--cian);background:rgba(79,195,217,.12);}
+.en-senales{display:flex;flex-wrap:wrap;gap:7px;}
+.en-senal{background:var(--panel2);border:1.5px solid var(--linea);border-radius:999px;padding:8px 13px;color:var(--tenue);font-size:13px;}
+.en-senal[data-on="1"]{border-color:var(--cian);color:var(--texto);}
+.en-aviso{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid rgba(79,195,217,.55);border-radius:12px;padding:12px 14px;color:var(--texto);font-size:13.5px;margin-bottom:14px;line-height:1.4;}
+.en-aviso:hover{border-color:var(--cian);}
+.en-comp-fila{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;margin-bottom:9px;font-size:12.5px;color:var(--tenue);}
+.en-comp-fila i{display:block;height:14px;border-radius:4px;background:var(--cian);min-width:3px;}
+.en-comp-fila b{font-family:'Space Mono',monospace;font-size:11px;color:var(--texto);font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.en-punto-com{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:currentColor;}
 .en-estatura{display:flex;align-items:baseline;gap:9px;justify-content:center;font-size:12.5px;color:var(--tenue);margin:12px 0 0;}
 .en-gr2{display:flex;gap:3px;height:104px;}
 .en-col2{flex:1;min-width:0;display:flex;flex-direction:column;}
@@ -275,7 +294,30 @@ function Registro({ usuario }) {
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState(null);
 
+  const [comodidad, setComodidad] = useState([]);
+  const [horaRecordatorio, setHoraRecordatorio] = useState("21:00");
+  const [ahora, setAhora] = useState(horaActual);
+
   const coleccion = useCallback(() => collection(db, "usuarios", usuario.uid, "sesiones"), [usuario.uid]);
+
+  useEffect(
+    () =>
+      onSnapshot(
+        collection(db, "usuarios", usuario.uid, "comodidad"),
+        (snap) => setComodidad(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}
+      ),
+    [usuario.uid]
+  );
+  useEffect(
+    () => onSnapshot(doc(db, "usuarios", usuario.uid), (d) => setHoraRecordatorio(d.data()?.horaRecordatorio || "21:00"), () => {}),
+    [usuario.uid]
+  );
+  // el aviso de registro pendiente debe aparecer aunque nadie toque la pantalla
+  useEffect(() => {
+    const t = setInterval(() => setAhora(horaActual()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(
     () =>
@@ -301,6 +343,14 @@ function Registro({ usuario }) {
     Object.values(m).forEach((a) => a.sort((x, y) => minutos(x.inicio) - minutos(y.inicio)));
     return m;
   }, [sesiones]);
+
+  /* comodidad media por día, para el punto del calendario */
+  const comodidadPorDia = useMemo(() => {
+    const m = {};
+    comodidad.forEach((r) => (m[r.fecha] = m[r.fecha] ? [...m[r.fecha], r.nivel] : [r.nivel]));
+    Object.keys(m).forEach((f) => (m[f] = m[f].reduce((a, b) => a + b, 0) / m[f].length));
+    return m;
+  }, [comodidad]);
 
   /* rejilla del mes, empezando en lunes */
   const celdas = useMemo(() => {
@@ -405,11 +455,24 @@ function Registro({ usuario }) {
         <button className="en-pestana" aria-pressed={vista === "peso"} onClick={() => setVista("peso")}>
           Peso
         </button>
+        <button className="en-pestana" aria-pressed={vista === "comodidad"} onClick={() => setVista("comodidad")}>
+          Comodidad
+        </button>
       </div>
 
       {fallo && <p className="en-error">{fallo}</p>}
 
-      {vista === "peso" ? (
+      {vista !== "comodidad" &&
+        ahora >= horaRecordatorio &&
+        !comodidad.some((r) => r.fecha === isoLocal(new Date())) && (
+          <button className="en-aviso" onClick={() => setVista("comodidad")}>
+            Falta el registro de comodidad de hoy. Tocar para registrarlo →
+          </button>
+        )}
+
+      {vista === "comodidad" ? (
+        <Comodidad uid={usuario.uid} registros={comodidad} sesiones={sesiones} horaRecordatorio={horaRecordatorio} />
+      ) : vista === "peso" ? (
         <Peso uid={usuario.uid} />
       ) : vista === "analisis" ? (
         cargando ? (
@@ -476,10 +539,13 @@ function Registro({ usuario }) {
                     }}
                     aria-label={`${desdeIso(iso).getDate()} de ${MESES[cursor.m]}: ${
                       ss.length ? ss.map((s) => tipoDe(s.tipo).label).join(" y ") : "sin entrenamiento"
-                    }`}
+                    }${comodidadPorDia[iso] ? `, comodidad ${Math.round(comodidadPorDia[iso])} de 5` : ""}`}
                   >
                     <span className="en-num">{desdeIso(iso).getDate()}</span>
                     {ss.length > 0 && <span className="en-min">{total}′</span>}
+                    {comodidadPorDia[iso] && (
+                      <i className="en-punto-com" style={{ opacity: 0.25 + (comodidadPorDia[iso] / 5) * 0.6 }} />
+                    )}
                   </button>
                 );
               })}
@@ -584,6 +650,9 @@ function Sesion({ s, onEditar, onEliminar }) {
         <div className="en-horas">
           {s.inicio} – {s.fin}
           {cruzaMedianoche(s) && <span className="en-cruce"> +1 día</span>}
+          {(s.lata_antes != null || s.lata_despues != null) && (
+            <span> · lata {s.lata_antes ?? "—"} → {s.lata_despues ?? "—"}</span>
+          )}
         </div>
         {s.comentario && <p className="en-coment">{s.comentario}</p>}
         <div className="en-ops">
@@ -608,6 +677,11 @@ function Formulario({ inicial, fechaPorDefecto, onGuardar, onCancelar }) {
   const [inicio, setInicio] = useState(inicial?.inicio || "");
   const [fin, setFin] = useState(inicial?.fin || "");
   const [comentario, setComentario] = useState(inicial?.comentario || "");
+  const [lataAntes, setLataAntes] = useState(inicial?.lata_antes ?? null);
+  const [lataDespues, setLataDespues] = useState(inicial?.lata_despues ?? null);
+  // la lata real se pregunta recién al guardar, para no responderla mirando
+  // lo que se contestó de la anticipada
+  const [pasoLata, setPasoLata] = useState(false);
   const [error, setError] = useState("");
   const caja = useRef(null);
 
@@ -624,7 +698,20 @@ function Formulario({ inicial, fechaPorDefecto, onGuardar, onCancelar }) {
     if (!inicio || !fin) return setError("Completa la hora de inicio y la de término.");
     if (minutos(fin) === minutos(inicio)) return setError("La hora de término no puede ser igual a la de inicio.");
     setError("");
-    onGuardar({ fecha, tipo, inicio, fin, comentario: comentario.trim() });
+    if (!inicial && !pasoLata) return setPasoLata(true);
+    guardarTodo(lataDespues);
+  }
+
+  function guardarTodo(despues) {
+    onGuardar({
+      fecha,
+      tipo,
+      inicio,
+      fin,
+      comentario: comentario.trim(),
+      lata_antes: lataAntes,
+      lata_despues: despues,
+    });
   }
 
   return (
@@ -685,14 +772,61 @@ function Formulario({ inicial, fechaPorDefecto, onGuardar, onCancelar }) {
         />
       </div>
 
+      <div className="en-campo">
+        <label className="en-label">¿Cuánta lata te daba salir? (opcional)</label>
+        <FilaLata valor={lataAntes} onCambiar={setLataAntes} nombre="lata anticipada" />
+      </div>
+
+      {inicial && (
+        <div className="en-campo">
+          <label className="en-label">¿Y cuánta fue en realidad? (opcional)</label>
+          <FilaLata valor={lataDespues} onCambiar={setLataDespues} nombre="lata real" />
+        </div>
+      )}
+
       {error && <p className="en-error">{error}</p>}
 
-      <div className="en-acciones">
-        <button className="en-guardar" onClick={enviar}>
-          {inicial ? "Guardar cambios" : "Registrar sesión"}
+      {pasoLata ? (
+        <div className="en-campo">
+          <label className="en-label">¿Y cuánta lata fue en realidad? Tocar guarda la sesión.</label>
+          <FilaLata
+            valor={lataDespues}
+            onCambiar={(v) => guardarTodo(v)}
+            nombre="lata real"
+          />
+          <div className="en-acciones" style={{ marginTop: 12 }}>
+            <button className="en-secund" style={{ flex: 1 }} onClick={() => guardarTodo(null)}>
+              Guardar sin responder
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="en-acciones">
+          <button className="en-guardar" onClick={enviar}>
+            {inicial ? "Guardar cambios" : "Registrar sesión"}
+          </button>
+          <button className="en-secund" onClick={onCancelar}>Cancelar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// cinco botones de 1 a 5; volver a tocar el elegido lo deselecciona
+function FilaLata({ valor, onCambiar, nombre }) {
+  return (
+    <div className="en-niveles">
+      {NIVELES.map((n) => (
+        <button
+          key={n.valor}
+          className="en-nivel"
+          data-on={valor === n.valor ? "1" : "0"}
+          aria-label={`${nombre}: ${n.valor} de 5`}
+          onClick={() => onCambiar(valor === n.valor ? null : n.valor)}
+        >
+          <b>{n.valor}</b>
         </button>
-        <button className="en-secund" onClick={onCancelar}>Cancelar</button>
-      </div>
+      ))}
     </div>
   );
 }

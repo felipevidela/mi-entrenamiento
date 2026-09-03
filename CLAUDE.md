@@ -1,6 +1,6 @@
 # Mi entrenamiento
 
-App personal para registrar entrenamientos y peso. React + Vite, Firebase (acceso con
+App personal para registrar entrenamientos, peso y comodidad física. React + Vite, Firebase (acceso con
 Google y Firestore) desde el cliente, desplegada como sitio estático en Vercel.
 
 - Producción: https://mi-entrenamiento-fvm.vercel.app
@@ -28,10 +28,17 @@ firebase deploy --only firestore:rules
 ## Modelo de datos
 
 ```
-usuarios/{uid}                  { estaturaCm }
-usuarios/{uid}/sesiones/{id}    { fecha, tipo, inicio, fin, comentario }
+usuarios/{uid}                  { estaturaCm, horaRecordatorio }
+usuarios/{uid}/sesiones/{id}    { fecha, tipo, inicio, fin, comentario, lata_antes, lata_despues }
 usuarios/{uid}/pesos/{id}       { fecha, hora, kg, grasa, comentario }
+usuarios/{uid}/comodidad/{id}   { fecha, hora, nivel, senales, comentario }
 ```
+
+- `lata_antes` y `lata_despues` son 1..5 opcionales (`null` si no se respondieron); los
+  documentos de sesión antiguos no los tienen y todo debe tolerarlo.
+- `nivel` es 1 (muy incómodo) a 5 (muy cómodo). `senales` es una lista de ids físicos
+  (`ropa_apretada`, `sudor`, `pesadez`, `energia_baja`, `dormi_mal`, `rigidez`). **Prohibido
+  agregar campos de apariencia o autoimagen**: la app registra sensación corporal.
 
 - En pesos se admiten varias pesadas por día; la `hora` es lo que las distingue y las ordena.
   `grasa` es opcional y vale `null` cuando no se midió.
@@ -42,6 +49,19 @@ usuarios/{uid}/pesos/{id}       { fecha, hora, kg, grasa, comentario }
   siguiente.
 - Las horas son strings `"HH:MM"`. `duracion()` suma 24 h cuando el término es anterior al
   inicio, porque una sesión puede cruzar la medianoche y se atribuye al día en que empezó.
+
+## Límite permanente
+
+Esta app registra sesiones, comodidad y peso. Nada más. No se agregan scores compuestos,
+índices, predicciones, recomendaciones ni consejos. La app informa, no aconseja.
+
+En concreto: las comparaciones de comodidad no se muestran hasta tener 10 días registrados
+y 3 por grupo, siempre con el n visible, y si la diferencia no supera dos errores estándar
+se rotula "sin diferencia clara todavía". Nada de rachas de días incómodos, deudas ni
+mensajes motivacionales. El recordatorio diario es una alarma nativa del teléfono más el
+aviso in-app desde `horaRecordatorio`: la web no puede enviarse notificaciones locales a
+hora fija y el push remoto exigiría un servidor (posible fase 2 con un cron de GitHub
+Actions, no construida).
 
 ## Convenciones
 
